@@ -26,11 +26,18 @@
             <tr class="border-b hover:bg-gray-100">
                 <td class="px-4 py-2">{{ $table }}</td>
                 <td class="flex px-4 py-2 gap-1">
-                    <button   button  class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600" data-modal-target="edit-modal-{{ $table }}" data-modal-toggle="edit-modal-{{ $table }}" type="button">Edit</button>
-                    <form action="{{ route('tables.delete') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this table?')">
+                <form action="{{ route('windows.edit', ['tableName' => $table]) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                        Edit
+                    </button>
+                </form>
+                    <form action="{{ route('tables.delete', ['tableName' => $table]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this table?')">
                     @csrf
                         <input type="hidden" name="table_name" value="{{ $table }}">
-                        <button type="submit" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
+                        <button type="submit" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                            Delete
+                        </button>
                     </form>
                 </td>
             </tr>
@@ -43,37 +50,7 @@
 
 
 
-
-@foreach($tables as $table)
-
-    <!-- Modal for editing table name -->
-    <div id="edit-modal-{{ $table }}" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full px-4 z-50">
-        <div class="relative top-40 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <h2 class="text-2xl font-semibold">Edit Table: {{ $table }}</h2>
-            <form action="{{ route('tables.update') }}" method="POST">
-                @csrf
-                <input type="hidden" name="old_table_name" value="{{ $table }}">
-                <div class="mt-3">
-                    <label for="new_table_name" class="block text-sm">New Table Name:</label>
-                    <input type="text" id="new_table_name" name="new_table_name" class="w-full p-2 border rounded" required>
-                </div>
-                <div class="mt-5 flex justify-between">
-                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Save</button>
-                    <button type="button" class="bg-gray-300 px-4 py-2 rounded" data-modal-hide="edit-modal-{{ $table }}">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-@endforeach
-
 <script>
-    // Show modal for edit
-    document.querySelectorAll("[data-modal-toggle]").forEach(button => {
-        button.addEventListener("click", () => {
-            const targetModal = button.getAttribute("data-modal-target");
-            document.getElementById(targetModal).classList.remove('hidden');
-        });
-    });
 
     // Confirm delete action
     function confirmDelete(message) {

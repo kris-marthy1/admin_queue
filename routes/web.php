@@ -8,8 +8,11 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\LoginVerifyController;
 
 
+Route::post('/edit_window/{tableName}', [MainController::class, 'edit'])->name('windows.edit');
+Route::put('/update_window', [MainController::class, 'update'])->name('windows.update');
+Route::delete('/windows/delete-column', [MainController::class, 'deleteColumn'])->name('windows.deleteColumn');
+Route::get('/edit_window/{tableName}', [MainController::class, 'deleteColumnPage'])->name('windows.deleteColumnPage');
 
-//
 Route::get('/staff', [StaffController::class, 'showStaffAccounts']);
 Route::post('/addStaffAccount', [StaffController::class, 'addStaffAccount']);
 Route::put('/editStaffAccount/{id}', [StaffController::class, 'updateAccount']);

@@ -42,7 +42,23 @@ public function estab_add_windows_form()
     {
         return view('estab_pages/estab_add_windows_form');
     }
-
+    
+    public function deleteTable(Request $request)
+    {
+        $tableName = $request->table_name;
+    
+        // Drop the table if it exists
+        if (Schema::hasTable($tableName)) {
+            Schema::drop($tableName);
+            
+            // Delete the record directly from window table
+            Window::where('window_name', $tableName)->delete();
+    
+            return redirect('/add_window')->with('success', 'Table and window record deleted successfully.');
+        }
+    
+        return redirect('/add_window')->with('success', 'Records deleted successfully.');
+    }
 
 
 
@@ -82,8 +98,116 @@ public function estab_add_windows_form()
         return view('estab_pages/estab_manage_window', ['tables' => $filteredTables]);
     }
 // DISPLAY TABLES IN MANAGE WINDOWS ==========================================================================
+public function edit($tableName)
+    {
+        // Check if table exists
+        if (!Schema::hasTable($tableName)) {
+            return redirect()->back()->with('error', 'Table does not exist.');
+        }
 
-public function createTable(Request $request)
+        // Get column information
+        $columns = DB::select("SHOW COLUMNS FROM $tableName");
+
+        return view('estab_pages/estab_edit_windows_form', [
+            'tableName' => $tableName,
+            'columns' => $columns
+        ]);
+    }
+
+    public function deleteColumnPage($tableName)
+    {
+        // Check if table exists
+        if (!Schema::hasTable($tableName)) {
+            return redirect()->back()->with('error', 'Table does not exist.');
+        }
+
+        // Get column information
+        $columns = DB::select("SHOW COLUMNS FROM $tableName");
+
+        return view('estab_pages/estab_edit_windows_form', [
+            'tableName' => $tableName,
+            'columns' => $columns
+        ]);
+    }
+
+
+    public function update(Request $request)
+    {
+        $request->validate([
+            'original_table_name' => 'required|string',
+            'new_table_name' => 'required|string',
+            'columns' => 'required|array',
+            'types' => 'required|array',
+        ]);
+
+        $originalTableName = $request->input('original_table_name');
+        $newTableName = $request->input('new_table_name');
+        $columns = $request->input('columns');
+        $types = $request->input('types');
+
+        if (count($columns) !== count($types)) {
+            return redirect()->back()->with('error', 'Mismatch between columns and types.');
+        }
+
+        try {
+            // Step 1: Rename the table
+            if ($originalTableName !== $newTableName) {
+                DB::statement("RENAME TABLE `$originalTableName` TO `$newTableName`");
+            }
+
+            // Step 2: Update columns
+            $currentColumns = DB::select("
+                SELECT COLUMN_NAME, COLUMN_TYPE
+                FROM information_schema.columns
+                WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?
+            ", [$newTableName, env('DB_DATABASE')]);
+
+            $currentColumnsMap = collect($currentColumns)->keyBy('COLUMN_NAME');
+
+            foreach ($columns as $index => $newColumnName) {
+                $oldColumnName = array_keys($currentColumnsMap->toArray())[$index] ?? null;
+                $newType = $types[$index];
+
+                if (!$oldColumnName) {
+                    // Add new column
+                    DB::statement("ALTER TABLE `$newTableName` ADD COLUMN `$newColumnName` $newType");
+                } elseif ($oldColumnName !== $newColumnName || $currentColumnsMap[$oldColumnName]->COLUMN_TYPE !== $newType) {
+                    // Rename or change type of existing column
+                    DB::statement("ALTER TABLE `$newTableName` CHANGE `$oldColumnName` `$newColumnName` $newType");
+                }
+            }
+            return redirect('/add_window')
+            ->with('success', "Service window `$newTableName` updated successfully.");
+            
+        
+        } catch (\Exception $e) {
+            return redirect('/edit_window/' . $oldTableName)
+            ->with('error', "Table `$oldTableName` failed to update.");
+        }
+    }
+
+    public function deleteColumn(Request $request)
+    {
+        $tableName = $request->input('table_name');
+        $columnName = $request->input('column_name');
+    
+        try {
+            Schema::table($tableName, function (Blueprint $table) use ($columnName) {
+                $table->dropColumn($columnName);
+            });
+    
+            
+            return redirect('/edit_window/' . $tableName)
+            ->with('success', "Table `$tableName` updated successfully.");
+        } catch (\Exception $e) {
+            return redirect('/edit_window/' . $tableName)
+            ->with('error', "Table `$tableName` failed to update.");
+        }
+    }
+
+    
+
+    public function createTable(Request $request)
 {
     // Validate table name with a more permissive rule
     $validatedData = $request->validate([
@@ -95,7 +219,7 @@ public function createTable(Request $request)
                 // Check if table already exists after converting to snake_case
                 $snakeCaseTableName = Str::snake($value);
                 if (Schema::hasTable($snakeCaseTableName)) {
-                    $fail('A table with this name already exists.');
+                    return redirect()->back()->with('error', 'Service window already exists!');
                 }
             }
         ],
@@ -105,7 +229,7 @@ public function createTable(Request $request)
             'string',
             'distinct'
         ],
-        'entities.*.type' => 'required|in:string,text,integer,bigInteger,float,double,decimal,boolean,date,datetime,timestamp,time'
+        'entities.*.type' => 'required|in:VARCHAR(255),DECIMAL(10,2),INT'  // Validating the type
     ]);
 
     // Convert table name to snake_case, handling spaces and special characters
@@ -125,46 +249,19 @@ public function createTable(Request $request)
                 $name = Str::snake($entity['name']); 
                 $type = $entity['type'];
 
-                // Map Laravel schema types to Blueprint methods
+                // Map frontend data types to database types
                 switch ($type) {
-                    case 'string':
-                        $table->string($name);
+                    case 'VARCHAR(255)':
+                        $table->string($name);  // Text
                         break;
-                    case 'text':
-                        $table->text($name);
+                    case 'DECIMAL(10,2)':
+                        $table->decimal($name, 10, 2);  // Number with 2 decimals
                         break;
-                    case 'integer':
-                        $table->integer($name);
-                        break;
-                    case 'bigInteger':
-                        $table->bigInteger($name);
-                        break;
-                    case 'float':
-                        $table->float($name);
-                        break;
-                    case 'double':
-                        $table->double($name);
-                        break;
-                    case 'decimal':
-                        $table->decimal($name);
-                        break;
-                    case 'boolean':
-                        $table->boolean($name);
-                        break;
-                    case 'date':
-                        $table->date($name);
-                        break;
-                    case 'datetime':
-                        $table->dateTime($name);
-                        break;
-                    case 'timestamp':
-                        $table->timestamp($name);
-                        break;
-                    case 'time':
-                        $table->time($name);
+                    case 'INT':
+                        $table->integer($name);  // Whole number (Integer)
                         break;
                     default:
-                        $table->string($name);
+                        $table->string($name);  // Default to string type if invalid
                 }
             }
         });
@@ -177,27 +274,10 @@ public function createTable(Request $request)
 
         return redirect('/add_window')->with('success', "Table '$tableName' created successfully");
     } catch (\Exception $e) {
-        return back()->with('error', 'Failed to create table: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'Failed to create table: Make sure to check if the service window with the same name already exists.');
     }
 }
-// Delete TABLE =======================================================================
 
-public function deleteTable(Request $request)
-{
-    $tableName = $request->table_name;
-
-    // Drop the table if it exists
-    if (Schema::hasTable($tableName)) {
-        Schema::drop($tableName);
-        
-        // Delete the record directly from window table
-        Window::where('window_name', $tableName)->delete();
-
-        return redirect('/add_window')->with('success', 'Table and window record deleted successfully.');
-    }
-
-    return redirect('/add_window')->with('success', 'Records deleted successfully.');
-}
 
  // UPDATE TABLE =====================================================================
  public function updateTableName(Request $request)
