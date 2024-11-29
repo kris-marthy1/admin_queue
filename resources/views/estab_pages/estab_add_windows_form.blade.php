@@ -5,17 +5,17 @@
         <form id="tableCreateForm" action="{{ route('createTable') }}" method="POST">
             @csrf
             <div>
-                <label class="dark:text-white text-2xl ">Enter Service Window name:</label>
+                <label class="dark:text-white text-2xl">Enter Service Window name:</label>
                 <input class="mt-3 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-white-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-dark dark:focus:ring-blue-500 dark:focus:border-blue-500" type="text" name="table_name" required>
             </div>
 
             @if (session('success'))
-        <div style="color: green;">{{ session('success') }}</div>
-    @endif
+                <div style="color: green;">{{ session('success') }}</div>
+            @endif
 
-    @if (session('error'))
-        <div style="color: red;">{{ session('error') }}</div>
-    @endif
+            @if (session('error'))
+                <div style="color: red;">{{ session('error') }}</div>
+            @endif
 
             <div class="flex items-center mt-10">
                 <p class="text-2xl">Input fields for Customer:</p>
@@ -28,7 +28,6 @@
                 <span class="text-gray-600">Add field</span>
             </div>
             <div id="entityContainer" class="mt-4 space-y-2">
-                <!-- Dynamic entities will be added here -->
             </div>
 
             <button class="mt-4 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800" type="submit">Create Table</button>
@@ -36,63 +35,36 @@
     </div>
 
     <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const addEntityBtn = document.getElementById('addEntityBtn');
-    const entityContainer = document.getElementById('entityContainer');
-    let entityCount = 0;
+    document.addEventListener('DOMContentLoaded', function() {
+        const addEntityBtn = document.getElementById('addEntityBtn');
+        const entityContainer = document.getElementById('entityContainer');
+        let entityCount = 0;
 
-    addEntityBtn.addEventListener('click', function() {
-        entityCount++;
+        addEntityBtn.addEventListener('click', function() {
+            entityCount++;
+            
+            const entityWrapper = document.createElement('div');
+            entityWrapper.className = 'flex items-center space-x-2';
 
-        // Create container for this entity input
-        const entityWrapper = document.createElement('div');
-        entityWrapper.className = 'flex items-center space-x-2';
+            const entityInput = document.createElement('input');
+            entityInput.type = 'text';
+            entityInput.name = `entities[${entityCount}][name]`;
+            entityInput.placeholder = 'Field Name';
+            entityInput.className = 'bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-white-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-dark dark:focus:ring-blue-500 dark:focus:border-blue-500';
+            entityInput.required = true;
 
-        // Create input for entity name
-        const entityInput = document.createElement('input');
-        entityInput.type = 'text';
-        entityInput.name = `entities[${entityCount}][name]`; // name input will be entities[1][name], entities[2][name], etc.
-        entityInput.placeholder = 'Entity Name';
-        entityInput.className = 'bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-white-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-dark dark:focus:ring-blue-500 dark:focus:border-blue-500';
-        entityInput.required = true;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.innerHTML = '✖';
+            removeBtn.className = 'text-red-500 hover:text-red-700 font-bold';
+            removeBtn.addEventListener('click', function() {
+                entityContainer.removeChild(entityWrapper);
+            });
 
-        // Create dropdown for data type
-        const dataTypeSelect = document.createElement('select');
-        dataTypeSelect.name = `entities[${entityCount}][type]`; // type input will be entities[1][type], entities[2][type], etc.
-        dataTypeSelect.className = 'bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-white-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-dark dark:focus:ring-blue-500 dark:focus:border-blue-500';
-        
-        // Populate data type options
-        const dataTypes = [
-            { value: 'VARCHAR(255)', text: 'Text' }, 
-            { value: 'DECIMAL(10,2)', text: 'Number with 2 Decimals' },
-            { value: 'INT', text: 'Whole number' }
-        ];
-        
-        dataTypes.forEach(type => {
-            const option = document.createElement('option');
-            option.value = type.value;
-            option.textContent = type.text;
-            dataTypeSelect.appendChild(option);
+            entityWrapper.appendChild(entityInput);
+            entityWrapper.appendChild(removeBtn);
+            entityContainer.appendChild(entityWrapper);
         });
-
-        // Create remove button
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.innerHTML = '✖';
-        removeBtn.className = 'text-red-500 hover:text-red-700 font-bold';
-        removeBtn.addEventListener('click', function() {
-            entityContainer.removeChild(entityWrapper);
-        });
-
-        // Append elements to wrapper
-        entityWrapper.appendChild(entityInput);
-        entityWrapper.appendChild(dataTypeSelect);
-        entityWrapper.appendChild(removeBtn);
-
-        // Add to container
-        entityContainer.appendChild(entityWrapper);
     });
-});
-</script>
-
+    </script>
 @endsection

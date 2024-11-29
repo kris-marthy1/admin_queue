@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use App\Models\Window;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+
 
 class MainController extends Controller
 {
@@ -99,174 +101,164 @@ public function estab_add_windows_form()
     }
 // DISPLAY TABLES IN MANAGE WINDOWS ==========================================================================
 public function edit($tableName)
-    {
-        // Check if table exists
-        if (!Schema::hasTable($tableName)) {
-            return redirect()->back()->with('error', 'Table does not exist.');
-        }
-
-        // Get column information
-        $columns = DB::select("SHOW COLUMNS FROM $tableName");
-
-        return view('estab_pages/estab_edit_windows_form', [
-            'tableName' => $tableName,
-            'columns' => $columns
-        ]);
+{
+    if (!Schema::hasTable($tableName)) {
+        return redirect()->back()->with('error', 'Table does not exist.');
     }
 
-    public function deleteColumnPage($tableName)
-    {
-        // Check if table exists
-        if (!Schema::hasTable($tableName)) {
-            return redirect()->back()->with('error', 'Table does not exist.');
-        }
+    // Get all columns
+    $columns = DB::select("SHOW COLUMNS FROM $tableName");
 
-        // Get column information
-        $columns = DB::select("SHOW COLUMNS FROM $tableName");
+    // Get the primary key column
+    $primaryKey = DB::select("SHOW KEYS FROM $tableName WHERE Key_name = 'PRIMARY'");
+    $primaryKeyName = $primaryKey[0]->Column_name ?? null;
 
-        return view('estab_pages/estab_edit_windows_form', [
-            'tableName' => $tableName,
-            'columns' => $columns
-        ]);
+    // Filter out the primary key
+    $filteredColumns = array_filter($columns, function ($column) use ($primaryKeyName) {
+        return $column->Field !== $primaryKeyName;
+    });
+
+    return view('estab_pages/estab_edit_windows_form', [
+        'tableName' => $tableName,
+        'columns' => $filteredColumns
+    ]);
+}
+
+public function deleteColumnPage($tableName)
+{
+    if (!Schema::hasTable($tableName)) {
+        return redirect()->back()->with('error', 'Table does not exist.');
     }
 
+    // Get all columns
+    $columns = DB::select("SHOW COLUMNS FROM $tableName");
 
-    public function update(Request $request)
-    {
+    // Get the primary key column
+    $primaryKey = DB::select("SHOW KEYS FROM $tableName WHERE Key_name = 'PRIMARY'");
+    $primaryKeyName = $primaryKey[0]->Column_name ?? null;
+
+    // Filter out the primary key
+    $filteredColumns = array_filter($columns, function ($column) use ($primaryKeyName) {
+        return $column->Field !== $primaryKeyName;
+    });
+
+    return view('estab_pages/estab_edit_windows_form', [
+        'tableName' => $tableName,
+        'columns' => $filteredColumns
+    ]);
+}
+
+public function update(Request $request)
+{
+    DB::beginTransaction();
+    try {
         $request->validate([
             'original_table_name' => 'required|string',
             'new_table_name' => 'required|string',
-            'columns' => 'required|array',
-            'types' => 'required|array',
+            'columns' => 'required|array'
         ]);
 
-        $originalTableName = $request->input('original_table_name');
-        $newTableName = $request->input('new_table_name');
-        $columns = $request->input('columns');
-        $types = $request->input('types');
+        $originalName = $request->original_table_name;
+        $newName = $request->new_table_name;
 
-        if (count($columns) !== count($types)) {
-            return redirect()->back()->with('error', 'Mismatch between columns and types.');
+        // Rename table if name changed
+        if ($originalName !== $newName) {
+            Schema::rename($originalName, $newName);
+
+            // Update window name
+            Window::where('window_name', $originalName)
+                ->update(['window_name' => $newName]);
         }
 
-        try {
-            // Step 1: Rename the table
-            if ($originalTableName !== $newTableName) {
-                DB::statement("RENAME TABLE `$originalTableName` TO `$newTableName`");
+        // Get existing columns
+        $existingColumns = Schema::getColumnListing($newName);
+
+        // Get primary key
+        $primaryKey = DB::select("SHOW KEYS FROM $newName WHERE Key_name = 'PRIMARY'")[0]->Column_name ?? null;
+
+        $columnsToKeep = [];
+        foreach ($request->columns as $index => $columnName) {
+            $snakeCaseColumnName = Str::snake($columnName);
+
+            // Skip primary key
+            if ($snakeCaseColumnName === $primaryKey) {
+                $columnsToKeep[] = $snakeCaseColumnName;
+                continue;
             }
 
-            // Step 2: Update columns
-            $currentColumns = DB::select("
-                SELECT COLUMN_NAME, COLUMN_TYPE
-                FROM information_schema.columns
-                WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?
-            ", [$newTableName, env('DB_DATABASE')]);
-
-            $currentColumnsMap = collect($currentColumns)->keyBy('COLUMN_NAME');
-
-            foreach ($columns as $index => $newColumnName) {
-                $oldColumnName = array_keys($currentColumnsMap->toArray())[$index] ?? null;
-                $newType = $types[$index];
-
-                if (!$oldColumnName) {
-                    // Add new column
-                    DB::statement("ALTER TABLE `$newTableName` ADD COLUMN `$newColumnName` $newType");
-                } elseif ($oldColumnName !== $newColumnName || $currentColumnsMap[$oldColumnName]->COLUMN_TYPE !== $newType) {
-                    // Rename or change type of existing column
-                    DB::statement("ALTER TABLE `$newTableName` CHANGE `$oldColumnName` `$newColumnName` $newType");
-                }
+            // Rename or add column
+            if (in_array($snakeCaseColumnName, $existingColumns)) {
+                $columnsToKeep[] = $snakeCaseColumnName;
+            } else {
+                Schema::table($newName, function (Blueprint $table) use ($snakeCaseColumnName) {
+                    $table->string($snakeCaseColumnName)->nullable();
+                });
+                $columnsToKeep[] = $snakeCaseColumnName;
             }
-            return redirect('/add_window')
-            ->with('success', "Service window `$newTableName` updated successfully.");
-            
-        
-        } catch (\Exception $e) {
-            return redirect('/edit_window/' . $oldTableName)
-            ->with('error', "Table `$oldTableName` failed to update.");
         }
-    }
 
-    public function deleteColumn(Request $request)
-    {
-        $tableName = $request->input('table_name');
-        $columnName = $request->input('column_name');
-    
-        try {
-            Schema::table($tableName, function (Blueprint $table) use ($columnName) {
-                $table->dropColumn($columnName);
-            });
-    
-            
-            return redirect('/edit_window/' . $tableName)
-            ->with('success', "Table `$tableName` updated successfully.");
-        } catch (\Exception $e) {
-            return redirect('/edit_window/' . $tableName)
-            ->with('error', "Table `$tableName` failed to update.");
+        // Remove columns not in the new schema
+        $columnsToRemove = array_diff($existingColumns, $columnsToKeep);
+        foreach ($columnsToRemove as $columnToRemove) {
+            if ($columnToRemove !== $primaryKey) {
+                Schema::table($newName, function (Blueprint $table) use ($columnToRemove) {
+                    $table->dropColumn($columnToRemove);
+                });
+            }
         }
+
+        DB::commit();
+        return redirect('/add_window')->with('success', 'Window updated successfully');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Window Update Error: ' . $e->getMessage(), [
+            'request_data' => $request->all(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return redirect()->back()->with('error', 'Failed to update window: ' . $e->getMessage());
     }
+}
 
-    
 
-    public function createTable(Request $request)
+
+
+public function deleteColumn(Request $request)
 {
-    // Validate table name with a more permissive rule
-    $validatedData = $request->validate([
-        'table_name' => [
-            'required',
-            'string',
-            'max:64',
-            function ($attribute, $value, $fail) {
-                // Check if table already exists after converting to snake_case
-                $snakeCaseTableName = Str::snake($value);
-                if (Schema::hasTable($snakeCaseTableName)) {
-                    return redirect()->back()->with('error', 'Service window already exists!');
-                }
-            }
-        ],
-        'entities' => 'sometimes|array',
-        'entities.*.name' => [
-            'required',
-            'string',
-            'distinct'
-        ],
-        'entities.*.type' => 'required|in:VARCHAR(255),DECIMAL(10,2),INT'  // Validating the type
-    ]);
-
-    // Convert table name to snake_case, handling spaces and special characters
-    $tableName = Str::snake($validatedData['table_name']); 
-
     try {
-        // Dynamically create the table
-        Schema::create($tableName, function (Blueprint $table) {
-            // Always have an ID column as primary key
+        Schema::table($request->table_name, function (Blueprint $table) use ($request) {
+            $table->dropColumn($request->column_name);
+        });
+        
+        return redirect()->back()->with('success', 'Column deleted successfully');
+    } catch (\Exception $e) {
+        return redirect()->back()->with('error', 'Failed to delete column: ' . $e->getMessage());
+    }
+}
+
+public function createTable(Request $request)
+{
+    try {
+        // Validate request
+        $request->validate([
+            'table_name' => 'required|string|max:255',
+            'entities' => 'required|array',
+            'entities.*.name' => 'required|string|max:255'
+        ]);
+
+        $tableName = $request->table_name;
+
+        // Create table schema
+        Schema::create($tableName, function (Blueprint $table) use ($request) {
             $table->id('queue_id');
-
-            // Dynamically add entities
-            $entities = request()->input('entities', []);
-            
-            foreach ($entities as $entity) {
-                // Convert entity names to snake_case
-                $name = Str::snake($entity['name']); 
-                $type = $entity['type'];
-
-                // Map frontend data types to database types
-                switch ($type) {
-                    case 'VARCHAR(255)':
-                        $table->string($name);  // Text
-                        break;
-                    case 'DECIMAL(10,2)':
-                        $table->decimal($name, 10, 2);  // Number with 2 decimals
-                        break;
-                    case 'INT':
-                        $table->integer($name);  // Whole number (Integer)
-                        break;
-                    default:
-                        $table->string($name);  // Default to string type if invalid
-                }
+            foreach ($request->entities as $entity) {
+                // Convert column name to snake case
+                $columnName = Str::snake($entity['name']);
+                $table->string($columnName)->nullable();
             }
+            $table->timestamps();
         });
 
-        // Create a window record for the new table
+        // Create a window record
         $window = new Window;
         $window->window_name = $tableName;
         $window->status = 'open';
@@ -277,6 +269,7 @@ public function edit($tableName)
         return redirect()->back()->with('error', 'Failed to create table: Make sure to check if the service window with the same name already exists.');
     }
 }
+
 
 
  // UPDATE TABLE =====================================================================
