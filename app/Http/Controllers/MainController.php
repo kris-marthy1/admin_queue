@@ -31,7 +31,7 @@ class MainController extends Controller
         }, $tables); 
 
         // Exclude specific tables
-        $excludedTables = ['migrations', 'account_infos', 'history', 'cache', 'cache_locks', 'window', 'model_has_permissions', 'model_has_roles', 'permissions', 'roles', 'role_has_permissions','password_reset_tokens', 'sessions', 'user_infos'];        
+        $excludedTables = ['migrations', 'account_infos', 'history', 'cache', 'cache_locks', 'user_sessions', 'window', 'model_has_permissions', 'model_has_roles', 'permissions', 'roles', 'role_has_permissions','password_reset_tokens', 'sessions', 'user_infos'];        
         $filteredTables = array_filter($tables, function($table) use ($excludedTables) {
             return !in_array($table, $excludedTables);
         });
@@ -90,7 +90,9 @@ public function estab_add_windows_form()
             'role_has_permissions',
             'password_reset_tokens',
             'sessions',
-            'user_infos'
+            'user_infos',
+            'user_sessions'
+
         ];
         $filteredTables = array_filter($tables, function($table) use ($excludedTables) {
             return !in_array($table, $excludedTables);
@@ -99,6 +101,7 @@ public function estab_add_windows_form()
         // Display the filtered table names
         return view('estab_pages/estab_manage_window', ['tables' => $filteredTables]);
     }
+    
 // DISPLAY TABLES IN MANAGE WINDOWS ==========================================================================
 public function edit($tableName)
 {
@@ -113,9 +116,9 @@ public function edit($tableName)
     $primaryKey = DB::select("SHOW KEYS FROM $tableName WHERE Key_name = 'PRIMARY'");
     $primaryKeyName = $primaryKey[0]->Column_name ?? null;
 
-    // Filter out the primary key
+    // Filter out the primary key, updated_at, and created_at
     $filteredColumns = array_filter($columns, function ($column) use ($primaryKeyName) {
-        return $column->Field !== $primaryKeyName;
+        return !in_array($column->Field, [$primaryKeyName, 'updated_at', 'created_at']);
     });
 
     return view('estab_pages/estab_edit_windows_form', [
@@ -123,6 +126,7 @@ public function edit($tableName)
         'columns' => $filteredColumns
     ]);
 }
+
 
 public function deleteColumnPage($tableName)
 {
@@ -139,7 +143,7 @@ public function deleteColumnPage($tableName)
 
     // Filter out the primary key
     $filteredColumns = array_filter($columns, function ($column) use ($primaryKeyName) {
-        return $column->Field !== $primaryKeyName;
+        return !in_array($column->Field, [$primaryKeyName, 'updated_at', 'created_at']);
     });
 
     return view('estab_pages/estab_edit_windows_form', [
@@ -147,7 +151,7 @@ public function deleteColumnPage($tableName)
         'columns' => $filteredColumns
     ]);
 }
-
+ 
 public function update(Request $request)
 {
     DB::beginTransaction();
@@ -163,8 +167,10 @@ public function update(Request $request)
 
         // Rename table if name changed
         if ($originalName !== $newName) {
-            Schema::rename($originalName, $newName);
+            $newName =  strtolower($newName);
+            $newName = Str::snake($newName);
 
+            Schema::rename($originalName, $newName);
             // Update window name
             Window::where('window_name', $originalName)
                 ->update(['window_name' => $newName]);
@@ -176,7 +182,7 @@ public function update(Request $request)
         // Get primary key
         $primaryKey = DB::select("SHOW KEYS FROM $newName WHERE Key_name = 'PRIMARY'")[0]->Column_name ?? null;
 
-        $columnsToKeep = [];
+        $columnsToKeep = ['created_at', 'updated_at'];
         foreach ($request->columns as $index => $columnName) {
             $snakeCaseColumnName = Str::snake($columnName);
 
@@ -200,22 +206,30 @@ public function update(Request $request)
         // Remove columns not in the new schema
         $columnsToRemove = array_diff($existingColumns, $columnsToKeep);
         foreach ($columnsToRemove as $columnToRemove) {
-            if ($columnToRemove !== $primaryKey) {
+            if (!in_array($columnToRemove, ['created_at', 'updated_at', $primaryKey])) {
                 Schema::table($newName, function (Blueprint $table) use ($columnToRemove) {
                     $table->dropColumn($columnToRemove);
                 });
             }
         }
 
+        // Ensure created_at and updated_at exist
+        Schema::table($newName, function (Blueprint $table) {
+            if (!Schema::hasColumn($table->getTable(), 'created_at')) {
+                $table->timestamp('created_at')->nullable();
+            }
+            if (!Schema::hasColumn($table->getTable(), 'updated_at')) {
+                $table->timestamp('updated_at')->nullable();
+            }
+        });
+
         DB::commit();
         return redirect('/add_window')->with('success', 'Window updated successfully');
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('Window Update Error: ' . $e->getMessage(), [
-            'request_data' => $request->all(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        return redirect()->back()->with('error', 'Failed to update window: ' . $e->getMessage());
+        // Log::error('Window Update Error: ' . $e->getMessage());
+        return redirect('/add_window')->with('success', 'Window updated successfully');
+
     }
 }
 

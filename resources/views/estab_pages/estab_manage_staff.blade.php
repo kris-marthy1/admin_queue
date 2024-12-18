@@ -154,6 +154,7 @@
             <tr>
                 <th class="px-4 py-2">Account Name</th>
                 <th class="px-4 py-2">Account Username</th>
+                <th class="px-4 py-2">Assigned Service Window</th>
                 <th class="px-4 py-2">Actions</th>
             </tr>
         </thead>
@@ -162,6 +163,13 @@
             <tr class="border-b hover:bg-gray-100" data-id="{{ $account->account_id }}">
                 <td class="px-4 py-2">{{ $account->account_name }}</td>
                 <td class="px-4 py-2">{{ $account->account_user }}</td>
+                <td class="px-4 py-2">
+                    {{ $account->window_name }}
+                    @if ($account->window_name )
+                    @else
+                        None
+                    @endif
+                </td>
                 <td class="px-4 py-2 flex">
                     <button data-modal-target="editAccountModal" data-modal-toggle="editAccountModal" class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Edit</button>
                     <form action="{{ url('/deleteStaffAccount/'.$account->account_id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this account?');">

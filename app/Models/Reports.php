@@ -12,9 +12,8 @@ class Reports extends Model
 
     protected $fillable = [
         'arrived_at',
-        'email',
-        'school_id',
-        'window_name',
+        'queue_id',
+        'window_id',
     ];
 
 }

@@ -22,5 +22,6 @@ class RoleSeeder extends Seeder
             'manage_window',
             'manage_staff',
         ];
+      
     }
 }

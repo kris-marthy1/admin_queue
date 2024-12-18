@@ -43,7 +43,7 @@ Route::get('/create-table', function () {
 //     return view('welcome');
 // });
 
-Route::delete('queues/{queueId}/{tableName}', [DatabaseController::class, 'skip_queue']);
+Route::delete('queues', [DatabaseController::class, 'skip_queue']);
 
 //===============================
 // Establishment routes

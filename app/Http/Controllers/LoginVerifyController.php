@@ -7,6 +7,7 @@ use App\Models\AccountInfo;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class LoginVerifyController extends Controller
 {
@@ -55,10 +56,22 @@ class LoginVerifyController extends Controller
         return view('welcome');
     }
 
-    public function dashboard(){
-            return view('estab_pages/estab_dashboard');
-        
-    }
+    public function dashboard(Request $request) 
+{
+    $historyRecords = DB::table('history')
+        ->leftJoin('window', 'history.window_id', '=', 'window.window_id')
+        ->select(
+            'history.report_id', 
+            'history.queue_id', 
+            'history.arrived_at', 
+            'window.window_name', 
+            'history.created_at'
+        )
+        ->orderBy('history.report_id', 'asc') // Optional: sort by most recent first
+        ->paginate(10); // 10 items per page
+
+    return view('estab_pages/estab_dashboard', compact('historyRecords'));
+}
 
     public function logout()
     {

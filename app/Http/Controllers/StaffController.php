@@ -12,49 +12,73 @@ use App\Models\DynamicTable;
 class StaffController extends Controller
 {
     
-    public function dashboard(Request $request){
-        return view('estab_pages/estab_dashboard');
+    public function dashboard(Request $request) {
+        $historyRecords = DB::table('history')
+            ->join('window', 'history.window_id', '=', 'window.window_id')
+            ->select(
+                'history.report_id', 
+                'history.queue_id', 
+                'history.arrived_at', 
+                'window.window_name', 
+                'history.created_at'
+            )
+            ->get();
+    
+        return view('estab_pages/estab_dashboard', compact('historyRecords'));
     }
-
+    
+    
 
     public function showStaffAccounts()
-{
-       // Get staff accounts
-       $staffAccounts = AccountInfo::role('staff', 'web')->get();
-
-       // Get filtered tables
-       $databaseName = env('DB_DATABASE');
-       $tables = collect(DynamicTable::getAllTableNames())
-           ->map(function($table) {
-               $array = (array)$table;
-               return array_values($array)[0];
-           })
-           ->filter(function($table) {
-               $excludedTables = [
-                   'migrations', 
-                   'account_infos', 
-                   'history', 
-                   'cache', 
-                   'cache_locks', 
-                   'window', 
-                   'model_has_permissions', 
-                   'model_has_roles', 
-                   'permissions', 
-                   'roles', 
-                   'role_has_permissions',
-                   'password_reset_tokens',
-                   'sessions',
-                   'user_infos'
-               ];
-               
-               return !in_array($table, $excludedTables);
-           })
-           ->values()
-           ->all();
-
-       // Return view with both sets of data
+    {
+        // Get staff accounts
+        $staffAccounts = AccountInfo::role('staff', 'web')->get();
+    
+        // Get filtered tables
+        $databaseName = env('DB_DATABASE');
+        $tables = collect(DynamicTable::getAllTableNames())
+            ->map(function ($table) {
+                $array = (array) $table;
+                return array_values($array)[0];
+            })
+            ->filter(function ($table) {
+                $excludedTables = [
+                    'migrations',
+                    'account_infos',
+                    'history',
+                    'cache',
+                    'cache_locks',
+                    'window',
+                    'model_has_permissions',
+                    'model_has_roles',
+                    'permissions',
+                    'roles',
+                    'role_has_permissions',
+                    'password_reset_tokens',
+                    'sessions',
+                    'user_infos',
+                    'user_sessions',
+                ];
+                return !in_array($table, $excludedTables);
+            })
+            ->values()
+            ->all();
+    
+        // Add `window_name` to each staff account
+        $staffAccounts = $staffAccounts->map(function ($staffAccount) {
+            $window = DB::connection('clientone')
+                ->table('window')
+                ->where('window_id', $staffAccount->window_id)
+                ->first();
+    
+            $staffAccount->window_name = $window ? $window->window_name : null;
+    
+            return $staffAccount;
+        });
+    
        return view('estab_pages/estab_manage_staff', compact('staffAccounts', 'tables'));
-}
+
+    }
 
 public function addStaffAccount(Request $request)
 {
@@ -87,7 +111,7 @@ public function addStaffAccount(Request $request)
         // Assign the staff role
         $AccountInfo->assignRole('staff');
         
-        return redirect()->back()->with('success', 'New staff account added successfully!');
+        return redirect()->back()->with('success', 'New staff account added successfully!'.$AccountInfo);
     } catch (\Exception $e) {
         return redirect()->back()
             ->with('error', 'Error creating account: ' . $e->getMessage())
