@@ -24,7 +24,7 @@ Route::post('/reports', [DatabaseController::class, 'store']);
 
 
 // Route to get table names and display the form with buttons
-Route::post('/tables', [DatabaseController::class, 'getTables'])->name('tables');
+Route::get('/tables', [DatabaseController::class, 'getTables'])->name('tables');
 
 // Route to get data from the selected table (will return JSON data)
 // Route::post('/view-table-data', [DatabaseController::class, 'getTableData'])->name('view.table.data');
@@ -60,6 +60,11 @@ Route::get('/estab_manage_queue', function () {
 Route::get('/add_window', [MainController::class, 'estab_add_windows']);
 Route::get('/add_windows_form', [MainController::class, 'estab_add_windows_form']);
 Route::post('/estab_manage_window', [MainController::class, 'estab_manage_window']);
+
+
+Route::post('/open_queue', [MainController::class, 'open_queue']);
+Route::post('/hold_queue', [MainController::class, 'hold_queue']);
+Route::post('/close_queue', [MainController::class, 'close_queue']);
 
 // POST for window update and delete actions
 Route::post('/tables/update', [MainController::class, 'updateTableName'])->name('tables.update');

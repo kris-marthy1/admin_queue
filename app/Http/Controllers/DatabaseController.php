@@ -43,40 +43,6 @@ class DatabaseController extends Controller
     // Method to return all table names
     public function getTables()
     {
-        // $databaseName = env('DB_DATABASE');
-        
-        // Get all table names
-        // $tables = collect(DynamicTable::getAllTableNames())
-            // ->map(function($table) {
-                // Convert stdClass to array and get the first value
-            //     $array = (array)$table;
-            //     return array_values($array)[0];
-            // })
-            // ->filter(function($table) {
-            //     // Define the excluded tables
-            //     $excludedTables = [
-            //         'migrations', 
-            //         'account_infos', 
-            //         'history', 
-            //         'cache', 
-            //         'cache_locks', 
-            //         'window', 
-            //         'model_has_permissions', 
-            //         'model_has_roles', 
-            //         'permissions', 
-            //         'roles', 
-            //         'role_has_permissions',
-            //         'password_reset_tokens',
-            //         'sessions',
-            //         'user_infos',
-            //         'user_sessions'
-            //     ];
-                
-            //     return !in_array($table, $excludedTables);
-            // })
-            // ->values()
-            // ->all();
-            // Get the currently logged-in user
             $user = Auth::user();
 
             // Fetch the windows associated with the logged-in user

@@ -9,23 +9,29 @@
         <thead class="bg-gray-200 text-gray-700 uppercase text-2xl font-semibold">
             <tr>
                 <th class="px-4 py-2 text-center">Window Name</th>
-                <th class="px-4 py-2">Actions</th>
+                <th class="px-4 py-2 text-center">Status</th>
+                <th class="px-2 py-2">Status Actions</th>
             </tr>
         </thead>
         <tbody class="text-gray-900 text-2xl">
            
             @foreach($tables as $table)
             
-                <form action="{{ url('/manage_queue') }}" method="POST" >
-                    @csrf
-                    <input type="hidden" value="{{ $table->window_name }}" name="table_name">
-                        <tr  >
+            <tr>
+                        <form action="{{ url('/manage_queue') }}" method="POST" >
+                            @csrf
+                            <input type="hidden" value="{{ $table->window_name }}" name="table_name">
                             <td class="px-4 py-2  text-center">
-                                <button type="submit" class="p-2 rounded-lg hover:bg-gray-200 w-1/4 ">
+                                <button type="submit" class="p-2 rounded-lg hover:bg-gray-200 w-4/6 ">
                                     {{ $table->window_name }}
                                 </button>
                                 <hr class="h-px bg-gray-200 border-0 dark:bg-gray-700 w-4/4">
                             </td>
+                            <td  class="px-4 py-2  text-center" >
+                            {{ $table->status }}
+
+                            </td>
+                            </form>
                             <td class="px-4 py-2 flex flex-col space-y-1">
                                 <form action="{{ url('/open_queue') }}" method="POST" >
                                     @csrf
@@ -50,10 +56,13 @@
                                 </form>
                             </td>
                         </tr>
-                </form>
             @endforeach
         </tbody>
     </table>
+    @if (session('success'))
+                <div style="color: green;">{{ session('success') }}</div>
+            @endif
+
 </div>
 
 @endsection

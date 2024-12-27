@@ -233,6 +233,37 @@ public function update(Request $request)
     }
 }
 
+public function open_queue(Request $request){
+        $window_id = $request->table_id;
+
+        $result = DB::connection('clientone')->table('window')
+        ->where('window_id', $window_id)
+        ->update(['status' => 'open', 'updated_at' => now()]);
+
+        return redirect('/tables')->with('success', 'Window status updated successfully');
+}
+
+public function hold_queue(Request $request){
+    $window_id = $request->table_id;
+
+     $result = DB::connection('clientone')->table('window')
+        ->where('window_id', $window_id)
+        ->update(['status' => 'hold', 'updated_at' => now()]);
+
+    return redirect('/tables')->with('success', 'Window status updated successfully');
+
+}
+
+public function close_queue(Request $request){
+    $window_id = $request->table_id;
+
+    $result = DB::connection('clientone')->table('window')
+    ->where('window_id', $window_id)
+    ->update(['status' => 'closed', 'updated_at' => now()]);
+
+    return redirect('/tables')->with('success', 'Window status updated successfully');
+}
+
 
 
 
