@@ -25,7 +25,7 @@ return new class extends Migration
     {
         Schema::table('account_infos', function (Blueprint $table) {
             Schema::table('account_infos', function (Blueprint $table) {
-                $table->string('account_role')->nullable(); // Adjust the column type as necessary
+                $table->dropColumn('account_role'); // Adjust the column type as necessary
             });
         });
     }
